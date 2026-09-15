@@ -1,0 +1,9 @@
+# Current (dataset access + config)
+datasets>=2.19.0
+python-dotenv>=1.0.0
+
+# Planned (baseline RAG and later stages)
+sentence-transformers>=3.0.0
+faiss-cpu>=1.8.0
+fastapi>=0.110.0
+uvicorn>=0.27.0
