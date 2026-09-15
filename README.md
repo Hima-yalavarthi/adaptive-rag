@@ -178,7 +178,9 @@ adaptive-rag/
 │   ├── ingestion/
 │   │   ├── load_hotpotqa.py    # local JSON + huggingface cache loaders
 │   │   └── chunk_hotpotqa.py   # sentence-level context chunking
-│   ├── retrieval/              # planned
+│   ├── retrieval/
+│   │   ├── build_index.py      # embed chunks + FAISS index
+│   │   └── search.py           # semantic search CLI
 │   ├── reranking/              # planned
 │   ├── generation/             # planned
 │   ├── verification/           # planned
@@ -191,7 +193,9 @@ adaptive-rag/
     │   ├── hotpotqa_train.json
     │   ├── hotpotqa_validation.json
     │   └── huggingface/        # full HF cache (*.arrow via Git LFS)
-    └── processed/              # chunk JSONL from step 1
+    └── processed/
+        ├── hotpotqa_*_chunks.jsonl
+        └── indexes/            # FAISS indexes (rebuild locally)
 ```
 
 ## Troubleshooting
@@ -212,7 +216,7 @@ adaptive-rag/
 | Curated HotpotQA JSON in repo | Done |
 | Full HotpotQA HF cache via Git LFS | Done |
 | Sentence chunking → `data/processed/` | Done |
-| Embeddings + FAISS retrieval | Not started |
+| Embeddings + FAISS retrieval | Done |
 | Reranking, generation, verification | Not started |
 | Adaptive retry, evaluation | Not started |
 
@@ -227,4 +231,27 @@ Writes sentence-level chunks to `data/processed/hotpotqa_<split>_chunks.jsonl`
 (`chunk_id`, `example_id`, `title`, `sent_id`, `text`). These map to HotpotQA
 supporting-fact annotations for later evaluation.
 
-Next milestone: embed chunks and build a FAISS index for semantic retrieval.
+### Step 2 — embed chunks and search with FAISS
+
+Uses `sentence-transformers/all-MiniLM-L6-v2` (384-d, normalized cosine via
+inner product).
+
+```bash
+# Build indexes (downloads the embedding model on first run)
+python -m src.retrieval.build_index --split validation
+python -m src.retrieval.build_index --split train
+
+# Semantic search
+python -m src.retrieval.search --split validation \
+  --query "Were Scott Derrickson and Ed Wood of the same nationality?" --top-k 5
+
+# Restrict to one HotpotQA example's context (distractor-style)
+python -m src.retrieval.search --split validation \
+  --query "Were Scott Derrickson and Ed Wood of the same nationality?" \
+  --example-id 5a8b57f25542995d1e6f1371 --top-k 5
+```
+
+Index files under `data/processed/indexes/` are large and Git-ignored; rebuild
+locally after cloning. Config JSON files record model name and vector counts.
+
+Next milestone: LLM answer generation for a baseline RAG pipeline.

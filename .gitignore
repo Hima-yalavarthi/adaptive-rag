@@ -24,22 +24,17 @@ data/**
 !data/raw/huggingface/
 !data/raw/huggingface/**
 !data/processed/
-!data/processed/.gitkeep
 !data/processed/*.jsonl
+!data/processed/indexes/
+!data/processed/indexes/*.json
+!data/processed/indexes/README.md
 *.lock
 *.incomplete_info.lock
 
-# Downloaded models, caches, and generated indexes (non-dataset)
-.cache/
-cache/
-models/
-checkpoints/
-*.safetensors
-*.pt
-*.pth
-*.bin
+# Large generated indexes (rebuild locally)
 *.faiss
 *.index
+data/processed/indexes/*_meta.jsonl
 
 # macOS
 .DS_Store

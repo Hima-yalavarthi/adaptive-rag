@@ -1,0 +1,9 @@
+{
+  "split": "validation",
+  "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+  "metric": "inner_product",
+  "normalized": true,
+  "dimension": 384,
+  "num_vectors": 20792,
+  "chunk_source": "data/processed/hotpotqa_validation_chunks.jsonl"
+}

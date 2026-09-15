@@ -1,1 +1,1 @@
-"""Semantic retrieval (planned)."""
+"""Semantic retrieval over embedded HotpotQA chunks."""
