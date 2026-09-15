@@ -20,7 +20,6 @@ dist/
 # - ignore lock files from the datasets library
 data/**
 !data/raw/
-!data/raw/.gitkeep
 !data/raw/*.json
 !data/raw/huggingface/
 !data/raw/huggingface/**
