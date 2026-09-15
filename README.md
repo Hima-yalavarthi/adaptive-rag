@@ -131,11 +131,19 @@ Relative paths resolve from the repository root. No API key is required for Hotp
 
 ### Dependencies
 
-| Package | Needed for |
-| --- | --- |
-| `python-dotenv` | Loading `.env` |
-| `datasets` | Full Hugging Face cache loader (`--source huggingface`) |
-| `sentence-transformers`, `faiss-cpu`, `fastapi`, `uvicorn` | Planned later stages |
+All project stages are listed in `requirements.txt`:
+
+| Group | Packages | Needed for |
+| --- | --- | --- |
+| Config / data | `python-dotenv`, `datasets` | `.env`, HotpotQA HF cache |
+| Processing | `numpy`, `pandas`, `tqdm`, `tiktoken` | data handling, progress, token/cost tracking |
+| Retrieval | `sentence-transformers`, `faiss-cpu`, `torch` | embeddings + vector search |
+| Generation | `openai`, `httpx`, `tenacity` | LLM API calls with retries |
+| API | `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings` | backend service |
+| Evaluation | `ragas`, `scikit-learn` | faithfulness / quality metrics |
+| Testing | `pytest`, `pytest-cov` | automated tests |
+
+Postgres/`pgvector` is commented out in `requirements.txt` as an optional alternative to FAISS.
 
 ## Load / verify the dataset
 
