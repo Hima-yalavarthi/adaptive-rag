@@ -14,10 +14,11 @@ dist/
 .env.*
 !.env.example
 
-# Local datasets (retain directory placeholders)
+# Data: track curated JSON subsets; ignore Hugging Face cache and other downloads
 data/**
 !data/raw/
 !data/raw/.gitkeep
+!data/raw/*.json
 !data/processed/
 !data/processed/.gitkeep
 

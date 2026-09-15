@@ -30,9 +30,17 @@ User Question
 
 ## Dataset
 
-[HotpotQA](https://hotpotqa.github.io/) (`hotpotqa/hotpot_qa`, `distractor` config)
-via Hugging Face. Multi-hop Wikipedia QA with supporting-fact annotations.
-Development will use a manageable subset; full splits are available for access checks.
+Curated [HotpotQA](https://hotpotqa.github.io/) distractor subsets are stored in
+the repo under `data/raw/`:
+
+| File | Examples |
+| --- | ---: |
+| `data/raw/hotpotqa_train.json` | 2,000 |
+| `data/raw/hotpotqa_validation.json` | 500 |
+
+Each record includes question, answer, context passages, and supporting facts.
+The full Hugging Face download is too large for GitHub; these subsets match the
+proposal’s planned development scale.
 
 ## Project structure
 
@@ -42,7 +50,7 @@ adaptive-rag/
 ├── requirements.txt
 ├── .env.example
 ├── src/
-│   ├── ingestion/          # HotpotQA loader (implemented)
+│   ├── ingestion/          # HotpotQA JSON loader (implemented)
 │   ├── retrieval/          # planned
 │   ├── reranking/          # planned
 │   ├── generation/         # planned
@@ -52,8 +60,8 @@ adaptive-rag/
 ├── tests/                  # planned
 ├── notebooks/
 └── data/
-    ├── raw/                # local downloads (gitignored)
-    └── processed/
+    ├── raw/                # curated HotpotQA JSON (in repo)
+    └── processed/          # future transformed data
 ```
 
 ## Setup
@@ -68,8 +76,6 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Optional: set `HOTPOTQA_CACHE_DIR` in `.env` (default: `data/raw/huggingface`).
-
 ## Confirm dataset access
 
 ```bash
@@ -77,14 +83,14 @@ python -m src.ingestion.load_hotpotqa
 python -m src.ingestion.load_hotpotqa --split validation
 ```
 
-First run needs internet and downloads into the local cache. No API key required.
+No download or API key is required — data is read from `data/raw/*.json`.
 
 ## Status
 
 | Area | Status |
 | --- | --- |
 | Project scaffold + README | Done |
-| HotpotQA load / access check | Done |
+| Curated HotpotQA data in repo | Done |
 | Chunking, embeddings, retrieval | Not started |
 | Reranking, generation, verification | Not started |
 | Adaptive retry, evaluation | Not started |
