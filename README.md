@@ -176,7 +176,8 @@ adaptive-rag/
 ├── .gitignore
 ├── src/
 │   ├── ingestion/
-│   │   └── load_hotpotqa.py    # local JSON + huggingface cache loaders
+│   │   ├── load_hotpotqa.py    # local JSON + huggingface cache loaders
+│   │   └── chunk_hotpotqa.py   # sentence-level context chunking
 │   ├── retrieval/              # planned
 │   ├── reranking/              # planned
 │   ├── generation/             # planned
@@ -190,7 +191,7 @@ adaptive-rag/
     │   ├── hotpotqa_train.json
     │   ├── hotpotqa_validation.json
     │   └── huggingface/        # full HF cache (*.arrow via Git LFS)
-    └── processed/              # future transformed data
+    └── processed/              # chunk JSONL from step 1
 ```
 
 ## Troubleshooting
@@ -210,8 +211,20 @@ adaptive-rag/
 | Project scaffold + README | Done |
 | Curated HotpotQA JSON in repo | Done |
 | Full HotpotQA HF cache via Git LFS | Done |
-| Chunking, embeddings, retrieval | Not started |
+| Sentence chunking → `data/processed/` | Done |
+| Embeddings + FAISS retrieval | Not started |
 | Reranking, generation, verification | Not started |
 | Adaptive retry, evaluation | Not started |
 
-Next milestone: document preprocessing, embeddings, and a baseline RAG pipeline.
+### Step 1 — chunk HotpotQA contexts
+
+```bash
+python -m src.ingestion.chunk_hotpotqa --split validation
+python -m src.ingestion.chunk_hotpotqa --split all
+```
+
+Writes sentence-level chunks to `data/processed/hotpotqa_<split>_chunks.jsonl`
+(`chunk_id`, `example_id`, `title`, `sent_id`, `text`). These map to HotpotQA
+supporting-fact annotations for later evaluation.
+
+Next milestone: embed chunks and build a FAISS index for semantic retrieval.

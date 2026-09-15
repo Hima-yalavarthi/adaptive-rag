@@ -25,6 +25,7 @@ data/**
 !data/raw/huggingface/**
 !data/processed/
 !data/processed/.gitkeep
+!data/processed/*.jsonl
 *.lock
 *.incomplete_info.lock
 
