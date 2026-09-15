@@ -1,8 +1,8 @@
-# Current (local JSON dataset + config)
+# Current
 python-dotenv>=1.0.0
+datasets>=2.19.0
 
 # Planned (baseline RAG and later stages)
-datasets>=2.19.0
 sentence-transformers>=3.0.0
 faiss-cpu>=1.8.0
 fastapi>=0.110.0

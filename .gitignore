@@ -14,15 +14,22 @@ dist/
 .env.*
 !.env.example
 
-# Data: track curated JSON subsets; ignore Hugging Face cache and other downloads
+# Data layout:
+# - curated JSON in data/raw/*.json (regular git)
+# - full Hugging Face cache under data/raw/huggingface (Git LFS for *.arrow)
+# - ignore lock files from the datasets library
 data/**
 !data/raw/
 !data/raw/.gitkeep
 !data/raw/*.json
+!data/raw/huggingface/
+!data/raw/huggingface/**
 !data/processed/
 !data/processed/.gitkeep
+*.lock
+*.incomplete_info.lock
 
-# Downloaded models, caches, and generated indexes
+# Downloaded models, caches, and generated indexes (non-dataset)
 .cache/
 cache/
 models/

@@ -30,17 +30,15 @@ User Question
 
 ## Dataset
 
-Curated [HotpotQA](https://hotpotqa.github.io/) distractor subsets are stored in
-the repo under `data/raw/`:
+[HotpotQA](https://hotpotqa.github.io/) distractor data is stored two ways:
 
-| File | Examples |
-| --- | ---: |
-| `data/raw/hotpotqa_train.json` | 2,000 |
-| `data/raw/hotpotqa_validation.json` | 500 |
+| Source | Location | Size | Use when |
+| --- | --- | --- | --- |
+| Curated JSON | `data/raw/hotpotqa_*.json` | 2,000 train + 500 validation | Fast local iteration |
+| Full HF cache | `data/raw/huggingface/` (Git LFS) | full train + validation | Full-data experiments |
 
-Each record includes question, answer, context passages, and supporting facts.
-The full Hugging Face download is too large for GitHub; these subsets match the
-proposal’s planned development scale.
+Arrow files in the Hugging Face cache are tracked with **Git LFS**. Clone with LFS
+installed (`brew install git-lfs && git lfs install`) so the full cache downloads.
 
 ## Project structure
 
@@ -60,15 +58,17 @@ adaptive-rag/
 ├── tests/                  # planned
 ├── notebooks/
 └── data/
-    ├── raw/                # curated HotpotQA JSON (in repo)
+    ├── raw/                # curated JSON + full HF cache (LFS)
     └── processed/          # future transformed data
 ```
 
 ## Setup
 
-Python 3.11+ recommended:
+Requires [Git LFS](https://git-lfs.com/) for the full Hugging Face cache.
 
 ```bash
+brew install git-lfs   # if needed
+git lfs install
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -79,18 +79,22 @@ cp .env.example .env
 ## Confirm dataset access
 
 ```bash
+# Curated subset (default, no LFS fetch required for day-to-day work)
 python -m src.ingestion.load_hotpotqa
-python -m src.ingestion.load_hotpotqa --split validation
-```
+python -m src.ingestion.load_hotpotqa --source local --split validation
 
-No download or API key is required — data is read from `data/raw/*.json`.
+# Full HotpotQA from the Git LFS Hugging Face cache
+python -m src.ingestion.load_hotpotqa --source huggingface
+python -m src.ingestion.load_hotpotqa --source huggingface --split train
+```
 
 ## Status
 
 | Area | Status |
 | --- | --- |
 | Project scaffold + README | Done |
-| Curated HotpotQA data in repo | Done |
+| Curated HotpotQA JSON in repo | Done |
+| Full HotpotQA HF cache via Git LFS | Done |
 | Chunking, embeddings, retrieval | Not started |
 | Reranking, generation, verification | Not started |
 | Adaptive retry, evaluation | Not started |
