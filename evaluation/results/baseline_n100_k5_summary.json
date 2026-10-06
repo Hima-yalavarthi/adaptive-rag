@@ -1,0 +1,39 @@
+{
+  "config": {
+    "system": "standard_rag",
+    "split": "validation",
+    "scope": "example",
+    "n": 100,
+    "top_k": 5,
+    "model": "llama3.2:3b",
+    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+  },
+  "n": 100,
+  "overall": {
+    "em": 0.4,
+    "f1": 0.5011,
+    "insufficient": 0.12,
+    "retrieval_recall": 0.5953,
+    "all_gold_retrieved": 0.33,
+    "citation_precision": 0.5617,
+    "citation_recall": 0.3603,
+    "retrieval_s": 0.0213,
+    "generation_s": 0.9945,
+    "prompt_tokens": 364.59,
+    "completion_tokens": 17.2
+  },
+  "by_type": {
+    "bridge": {
+      "n": 79,
+      "em": 0.3544,
+      "f1": 0.4449,
+      "retrieval_recall": 0.5584
+    },
+    "comparison": {
+      "n": 21,
+      "em": 0.5714,
+      "f1": 0.7122,
+      "retrieval_recall": 0.7341
+    }
+  }
+}

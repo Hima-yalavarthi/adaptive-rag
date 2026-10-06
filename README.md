@@ -202,7 +202,10 @@ adaptive-rag/
 │   │   └── baseline.py         # Standard RAG: retrieve → generate
 │   ├── verification/           # planned
 │   └── adaptive/               # planned
-├── evaluation/                 # planned
+├── evaluation/
+│   ├── metrics.py              # EM, F1, precision/recall
+│   ├── run_baseline.py         # Standard RAG evaluation
+│   └── results/                # per-question results + summaries
 ├── tests/                      # pytest: chunking + retrieval
 ├── pytest.ini
 ├── notebooks/
@@ -237,8 +240,9 @@ adaptive-rag/
 | Embeddings + FAISS retrieval | Done |
 | Answer generation (local Ollama) | Done |
 | End-to-end baseline RAG command | Done |
+| Baseline evaluation (100 questions) | Done |
 | Reranking, verification | Not started |
-| Adaptive retry, evaluation | Not started |
+| Adaptive retry, three-system comparison | Not started |
 
 ### Step 1 — chunk HotpotQA contexts
 
@@ -313,5 +317,47 @@ Example of the reliability problem this project targets (`--index 3`): retrieval
 finds both gold sentences (Ortaköy vs. Laleli), but the baseline still answers
 "yes" when the gold answer is "no".
 
-Next milestone: baseline evaluation on ~100 validation questions (retrieval
-recall@k and answer exact match / F1).
+### Step 5 — baseline evaluation
+
+```bash
+python -m evaluation.run_baseline --n 100 --top-k 5
+```
+
+Runs Standard RAG on the first N validation questions (distractor setting:
+each question searches only its own context) and writes per-question results
+and a summary to `evaluation/results/`. Answer metrics use the official
+HotpotQA normalization.
+
+**Baseline results** — 100 validation questions, `llama3.2:3b`, MiniLM
+embeddings, top-k = 5 (`evaluation/results/baseline_n100_k5_summary.json`):
+
+| Metric | Value |
+| --- | ---: |
+| Answer exact match | 40.0% |
+| Answer F1 | 50.1% |
+| Answered "insufficient evidence" | 12.0% |
+| Retrieval recall@5 (gold sentences found) | 59.5% |
+| All gold sentences retrieved | 33.0% |
+| Citation precision / recall | 56.2% / 36.0% |
+| Average latency | 1.02 s (retrieval 0.02 s, generation 0.99 s) |
+| Average tokens | 365 prompt + 17 completion |
+
+| Question type | n | EM | F1 | Retrieval recall |
+| --- | ---: | ---: | ---: | ---: |
+| Bridge | 79 | 35.4% | 44.5% | 55.8% |
+| Comparison | 21 | 57.1% | 71.2% | 73.4% |
+
+What this shows:
+
+- When all gold sentences were retrieved (33 questions), exact match was 72.7%.
+  When some were missing (67 questions), it fell to 23.9%.
+- With incomplete evidence, the model abstained only 12 times and gave a
+  confident wrong answer 39 times. Overall, 48 of 100 answers were confidently
+  wrong.
+- Even with complete evidence, 9 answers were still wrong (generation errors,
+  such as the Laleli Mosque example).
+
+These are the two failure modes the adaptive system targets: detecting weak
+evidence and retrieving more, and verifying answers against the evidence.
+
+Next milestone: reranking, then evidence verification and confidence scoring.

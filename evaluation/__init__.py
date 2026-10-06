@@ -1,1 +1,1 @@
-"""Evaluation metrics and experiment scripts (planned)."""
+"""Evaluation metrics and experiment scripts."""
