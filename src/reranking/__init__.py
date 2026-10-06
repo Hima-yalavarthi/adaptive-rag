@@ -1,1 +1,1 @@
-"""Passage reranking (planned)."""
+"""Cross-encoder reranking of retrieved sentences."""

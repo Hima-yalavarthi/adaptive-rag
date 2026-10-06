@@ -194,19 +194,20 @@ adaptive-rag/
 │   ├── retrieval/
 │   │   ├── build_index.py      # embed chunks + FAISS index
 │   │   └── search.py           # semantic search CLI
-│   ├── reranking/              # planned
+│   ├── reranking/
+│   │   └── cross_encoder.py    # cross-encoder reranker (top 20 → top 5)
 │   ├── generation/
 │   │   ├── prompts.py          # grounded prompt with numbered evidence
 │   │   └── llm.py              # Ollama client, JSON answer + citations
 │   ├── pipeline/
-│   │   └── baseline.py         # Standard RAG: retrieve → generate
+│   │   └── baseline.py         # Standard / Reranked RAG: retrieve → (rerank) → generate
 │   ├── verification/           # planned
 │   └── adaptive/               # planned
 ├── evaluation/
 │   ├── metrics.py              # EM, F1, precision/recall
-│   ├── run_baseline.py         # Standard RAG evaluation
+│   ├── run_baseline.py         # Standard / Reranked RAG evaluation (--rerank)
 │   └── results/                # per-question results + summaries
-├── tests/                      # pytest: chunking + retrieval
+├── tests/                      # pytest: chunking, retrieval, generation, reranking, pipeline, metrics
 ├── pytest.ini
 ├── notebooks/
 └── data/
@@ -241,7 +242,8 @@ adaptive-rag/
 | Answer generation (local Ollama) | Done |
 | End-to-end baseline RAG command | Done |
 | Baseline evaluation (100 questions) | Done |
-| Reranking, verification | Not started |
+| Cross-encoder reranking + Reranked RAG evaluation | Done |
+| Verification, confidence scoring | Not started |
 | Adaptive retry, three-system comparison | Not started |
 
 ### Step 1 — chunk HotpotQA contexts
@@ -360,4 +362,51 @@ What this shows:
 These are the two failure modes the adaptive system targets: detecting weak
 evidence and retrieving more, and verifying answers against the evidence.
 
-Next milestone: reranking, then evidence verification and confidence scoring.
+### Step 6 — Reranked RAG (cross-encoder)
+
+`src/reranking/cross_encoder.py` adds a second retrieval stage. FAISS fetches
+20 candidate sentences, then `cross-encoder/ms-marco-MiniLM-L-6-v2` scores each
+(question, "title: sentence") pair jointly and keeps the top 5 for generation.
+The model downloads on first use (~90 MB).
+
+```bash
+python -m src.pipeline.baseline --index 3 --rerank
+python -m evaluation.run_baseline --n 100 --rerank --candidate-k 20
+```
+
+**Standard RAG vs. Reranked RAG** — same 100 validation questions, same
+`llama3.2:3b` generator, top-k = 5
+(`evaluation/results/reranked_n100_k5_summary.json`):
+
+| Metric | Standard RAG | Reranked RAG | Change |
+| --- | ---: | ---: | ---: |
+| Answer exact match | 40.0% | 44.0% | +4.0 |
+| Answer F1 | 50.1% | 55.7% | +5.6 |
+| Retrieval recall@5 | 59.5% | 71.7% | +12.2 |
+| All gold sentences retrieved | 33.0% | 45.0% | +12.0 |
+| Citation precision | 56.2% | 65.5% | +9.3 |
+| Citation recall | 36.0% | 43.2% | +7.2 |
+| Answered "insufficient evidence" | 12.0% | 9.0% | −3.0 |
+| Average latency | 1.02 s | 1.12 s | +0.10 s |
+
+| Question type | Standard EM / F1 | Reranked EM / F1 | Recall@5 (std → reranked) |
+| --- | ---: | ---: | ---: |
+| Bridge (n=79) | 35.4% / 44.5% | 39.2% / 49.5% | 55.8% → 66.0% |
+| Comparison (n=21) | 57.1% / 71.2% | 61.9% / 79.2% | 73.4% → 93.2% |
+
+What this shows:
+
+- Reranking mainly fixes retrieval: 12 more questions get all their gold
+  sentences, for only ~0.04 s extra per question.
+- Answer accuracy improves less than retrieval. Reranking turned 11 wrong
+  answers into correct ones but 7 correct answers into wrong ones.
+- With complete evidence, the generator is still wrong on 16 of 45 questions
+  (EM 64.4%). The Laleli Mosque example now ranks both gold sentences first and
+  second, but the model still answers "yes".
+- 47 of 100 answers are still confidently wrong (48 for the baseline). Better
+  ranking alone does not make the system know when it is wrong.
+
+This motivates the next stages: verifying the answer against the evidence and
+scoring confidence, so weak or unsupported answers can be retried or abstained.
+
+Next milestone: evidence verification and confidence scoring.

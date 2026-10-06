@@ -38,6 +38,22 @@ def test_baseline_passes_retrieved_chunks_to_generator():
     assert result.total_s >= result.generation_s == 0.5
 
 
+class ReverseReranker:
+    def rerank(self, query, hits, top_k):
+        return list(reversed(hits))[:top_k]
+
+
+def test_reranked_pipeline_fetches_candidates_then_reranks():
+    retriever, generator = FakeRetriever(), FakeGenerator()
+    rag = BaselineRAG(retriever, generator, top_k=1, reranker=ReverseReranker(), candidate_k=2)
+    result = rag.answer("Same nationality?")
+
+    assert retriever.calls == [("Same nationality?", 2, None)]
+    assert generator.received == [CHUNKS[1]]
+    assert [h.chunk for h in result.evidence] == [CHUNKS[1]]
+    assert result.rerank_s >= 0
+
+
 def test_gold_facts_pairs_titles_with_sentence_ids():
     example = {"supporting_facts": {"title": ["Scott Derrickson", "Ed Wood"], "sent_id": [0, 0]}}
     assert gold_facts(example) == {("Scott Derrickson", 0), ("Ed Wood", 0)}

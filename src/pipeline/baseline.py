@@ -1,7 +1,11 @@
-"""Standard (baseline) RAG: retrieve top-k sentences, then generate one answer.
+"""Standard RAG and Reranked RAG: retrieve, optionally rerank, then generate one answer.
 
-No reranking, verification, or retries. This is the baseline the adaptive
-system will be compared against.
+- Standard RAG: take the FAISS top-k sentences.
+- Reranked RAG (--rerank): take the FAISS top candidate-k, rerank with a
+  cross-encoder, keep the top-k.
+
+Neither verifies the answer or retries. These are the systems the adaptive
+pipeline will be compared against.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ from typing import Any
 
 from src.generation.llm import GeneratedAnswer, OllamaGenerator
 from src.ingestion.load_hotpotqa import load_hotpotqa_local
+from src.reranking.cross_encoder import CrossEncoderReranker
 from src.retrieval.search import FaissRetriever, SearchHit
 
 
@@ -25,22 +30,39 @@ class RAGResult:
     retrieval_s: float
     generation_s: float
     generated: GeneratedAnswer
+    rerank_s: float = 0.0
 
     @property
     def total_s(self) -> float:
-        return self.retrieval_s + self.generation_s
+        return self.retrieval_s + self.rerank_s + self.generation_s
 
 
 class BaselineRAG:
-    def __init__(self, retriever: FaissRetriever, generator: OllamaGenerator, top_k: int = 5):
+    def __init__(
+        self,
+        retriever: FaissRetriever,
+        generator: OllamaGenerator,
+        top_k: int = 5,
+        reranker: CrossEncoderReranker | None = None,
+        candidate_k: int = 20,
+    ):
         self.retriever = retriever
         self.generator = generator
         self.top_k = top_k
+        self.reranker = reranker
+        self.candidate_k = max(candidate_k, top_k)
 
     def answer(self, question: str, example_id: str | None = None) -> RAGResult:
+        fetch_k = self.candidate_k if self.reranker else self.top_k
         start = time.perf_counter()
-        hits = self.retriever.search(question, top_k=self.top_k, example_id=example_id)
+        hits = self.retriever.search(question, top_k=fetch_k, example_id=example_id)
         retrieval_s = time.perf_counter() - start
+
+        rerank_s = 0.0
+        if self.reranker:
+            start = time.perf_counter()
+            hits = self.reranker.rerank(question, hits, top_k=self.top_k)
+            rerank_s = time.perf_counter() - start
 
         generated = self.generator.generate(question, [h.chunk for h in hits])
         return RAGResult(
@@ -49,6 +71,7 @@ class BaselineRAG:
             citations=generated.citations,
             evidence=hits,
             retrieval_s=retrieval_s,
+            rerank_s=rerank_s,
             generation_s=generated.latency_s,
             generated=generated,
         )
@@ -76,7 +99,8 @@ def print_result(result: RAGResult, example: dict[str, Any] | None) -> None:
     print(f"Answer:   {result.answer}")
     if example:
         print(f"Gold:     {example['answer']}")
-    print(f"Time:     retrieval {result.retrieval_s:.2f}s + generation {result.generation_s:.2f}s")
+    rerank = f" + rerank {result.rerank_s:.2f}s" if result.rerank_s else ""
+    print(f"Time:     retrieval {result.retrieval_s:.2f}s{rerank} + generation {result.generation_s:.2f}s")
 
     print(f"\nRetrieved evidence (top {len(result.evidence)}; * = cited by model, G = gold supporting fact):")
     for i, hit in enumerate(result.evidence, start=1):
@@ -98,6 +122,8 @@ def main() -> None:
     source.add_argument("--index", type=int, help="Use the question from the N-th example in the split.")
     parser.add_argument("--split", choices=("train", "validation"), default="validation")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--rerank", action="store_true", help="Rerank candidates with a cross-encoder.")
+    parser.add_argument("--candidate-k", type=int, default=20, help="Candidates retrieved before reranking.")
     parser.add_argument(
         "--scope",
         choices=("example", "global"),
@@ -115,7 +141,13 @@ def main() -> None:
         if args.scope == "example":
             example_filter = example["id"]
 
-    rag = BaselineRAG(FaissRetriever(split=args.split), OllamaGenerator(), top_k=args.top_k)
+    rag = BaselineRAG(
+        FaissRetriever(split=args.split),
+        OllamaGenerator(),
+        top_k=args.top_k,
+        reranker=CrossEncoderReranker() if args.rerank else None,
+        candidate_k=args.candidate_k,
+    )
     print_result(rag.answer(question, example_id=example_filter), example)
 
 

@@ -1,4 +1,4 @@
-"""Evaluate Standard RAG on HotpotQA validation questions.
+"""Evaluate Standard RAG (or Reranked RAG with --rerank) on HotpotQA validation questions.
 
 Uses the distractor setting: each question retrieves only from its own
 example's context. Writes per-question results and a summary to
@@ -19,6 +19,7 @@ from evaluation.metrics import exact_match, f1_score, set_precision_recall
 from src.generation.llm import OllamaGenerator
 from src.ingestion.load_hotpotqa import PROJECT_ROOT, load_hotpotqa_local
 from src.pipeline.baseline import BaselineRAG, gold_facts
+from src.reranking.cross_encoder import CrossEncoderReranker
 from src.retrieval.search import FaissRetriever
 
 RESULTS_DIR = PROJECT_ROOT / "evaluation" / "results"
@@ -48,6 +49,7 @@ def evaluate_example(rag: BaselineRAG, example: dict) -> dict:
         "citation_precision": citation_precision,
         "citation_recall": citation_recall,
         "retrieval_s": result.retrieval_s,
+        "rerank_s": result.rerank_s,
         "generation_s": result.generation_s,
         "prompt_tokens": result.generated.prompt_tokens,
         "completion_tokens": result.generated.completion_tokens,
@@ -63,6 +65,7 @@ METRICS = (
     "citation_precision",
     "citation_recall",
     "retrieval_s",
+    "rerank_s",
     "generation_s",
     "prompt_tokens",
     "completion_tokens",
@@ -86,8 +89,12 @@ def summarize(rows: list[dict]) -> dict:
 
 def print_summary(summary: dict, config: dict) -> None:
     o = summary["overall"]
-    print(f"\nStandard RAG on {summary['n']} HotpotQA validation questions")
-    print(f"model={config['model']}  top_k={config['top_k']}  embedding={config['embedding_model']}\n")
+    title = "Reranked RAG" if config["reranker"] else "Standard RAG"
+    print(f"\n{title} on {summary['n']} HotpotQA validation questions")
+    print(f"model={config['model']}  top_k={config['top_k']}  embedding={config['embedding_model']}")
+    if config["reranker"]:
+        print(f"reranker={config['reranker']}  candidate_k={config['candidate_k']}")
+    print()
     print(f"  Answer exact match      {o['em']:.1%}")
     print(f"  Answer F1               {o['f1']:.1%}")
     print(f"  'Insufficient evidence' {o['insufficient']:.1%}")
@@ -95,8 +102,9 @@ def print_summary(summary: dict, config: dict) -> None:
     print(f"  All gold retrieved      {o['all_gold_retrieved']:.1%}")
     print(f"  Citation precision      {o['citation_precision']:.1%}  (cited sentences that are gold)")
     print(f"  Citation recall         {o['citation_recall']:.1%}  (gold sentences the model cited)")
-    print(f"  Avg latency             {o['retrieval_s'] + o['generation_s']:.2f}s "
-          f"(retrieval {o['retrieval_s']:.2f}s, generation {o['generation_s']:.2f}s)")
+    total = o["retrieval_s"] + o["rerank_s"] + o["generation_s"]
+    print(f"  Avg latency             {total:.2f}s (retrieval {o['retrieval_s']:.2f}s, "
+          f"rerank {o['rerank_s']:.2f}s, generation {o['generation_s']:.2f}s)")
     print(f"  Avg tokens              {o['prompt_tokens']:.0f} prompt + {o['completion_tokens']:.0f} completion")
     print("\n  By question type:")
     for t, s in summary["by_type"].items():
@@ -107,23 +115,29 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n", type=int, default=100, help="Number of validation questions (default: 100).")
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--name", default="baseline", help="Prefix for output files.")
+    parser.add_argument("--rerank", action="store_true", help="Rerank candidates with a cross-encoder.")
+    parser.add_argument("--candidate-k", type=int, default=20, help="Candidates retrieved before reranking.")
+    parser.add_argument("--name", default=None, help="Prefix for output files (default: baseline or reranked).")
     args = parser.parse_args()
+    args.name = args.name or ("reranked" if args.rerank else "baseline")
 
     examples = load_hotpotqa_local("validation")[: args.n]
     retriever = FaissRetriever(split="validation")
     generator = OllamaGenerator()
-    rag = BaselineRAG(retriever, generator, top_k=args.top_k)
+    reranker = CrossEncoderReranker() if args.rerank else None
+    rag = BaselineRAG(retriever, generator, top_k=args.top_k, reranker=reranker, candidate_k=args.candidate_k)
 
     rows = [evaluate_example(rag, ex) for ex in tqdm(examples, desc="Evaluating")]
     config = {
-        "system": "standard_rag",
+        "system": "reranked_rag" if reranker else "standard_rag",
         "split": "validation",
         "scope": "example",
         "n": len(rows),
         "top_k": args.top_k,
         "model": generator.model,
         "embedding_model": retriever.model_name,
+        "reranker": reranker.model_name if reranker else None,
+        "candidate_k": args.candidate_k if reranker else None,
     }
     summary = {"config": config, **summarize(rows)}
 

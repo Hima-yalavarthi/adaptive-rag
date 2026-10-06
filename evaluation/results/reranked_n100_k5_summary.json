@@ -1,0 +1,42 @@
+{
+  "config": {
+    "system": "reranked_rag",
+    "split": "validation",
+    "scope": "example",
+    "n": 100,
+    "top_k": 5,
+    "model": "llama3.2:3b",
+    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "candidate_k": 20
+  },
+  "n": 100,
+  "overall": {
+    "em": 0.44,
+    "f1": 0.5572,
+    "insufficient": 0.09,
+    "retrieval_recall": 0.7173,
+    "all_gold_retrieved": 0.45,
+    "citation_precision": 0.6548,
+    "citation_recall": 0.432,
+    "retrieval_s": 0.0187,
+    "rerank_s": 0.0408,
+    "generation_s": 1.0613,
+    "prompt_tokens": 377.17,
+    "completion_tokens": 17.44
+  },
+  "by_type": {
+    "bridge": {
+      "n": 79,
+      "em": 0.3924,
+      "f1": 0.4949,
+      "retrieval_recall": 0.6601
+    },
+    "comparison": {
+      "n": 21,
+      "em": 0.619,
+      "f1": 0.7916,
+      "retrieval_recall": 0.9325
+    }
+  }
+}
