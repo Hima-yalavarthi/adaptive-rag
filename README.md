@@ -198,6 +198,8 @@ adaptive-rag/
 │   ├── generation/
 │   │   ├── prompts.py          # grounded prompt with numbered evidence
 │   │   └── llm.py              # Ollama client, JSON answer + citations
+│   ├── pipeline/
+│   │   └── baseline.py         # Standard RAG: retrieve → generate
 │   ├── verification/           # planned
 │   └── adaptive/               # planned
 ├── evaluation/                 # planned
@@ -234,6 +236,7 @@ adaptive-rag/
 | Sentence chunking → `data/processed/` | Done |
 | Embeddings + FAISS retrieval | Done |
 | Answer generation (local Ollama) | Done |
+| End-to-end baseline RAG command | Done |
 | Reranking, verification | Not started |
 | Adaptive retry, evaluation | Not started |
 
@@ -285,4 +288,30 @@ ollama pull llama3.2:3b      # first time only
 
 Configure the host and model in `.env` (`OLLAMA_HOST`, `OLLAMA_MODEL`).
 
-Next milestone: end-to-end baseline RAG command (question → retrieve → answer + evidence).
+### Step 4 — end-to-end baseline RAG
+
+`src/pipeline/baseline.py` runs Standard RAG: retrieve the top-k sentences, then
+generate one answer. There is no reranking, verification, or retry; this is the
+baseline the adaptive system will be compared against.
+
+```bash
+# Question from a validation example (searches only that example's context)
+python -m src.pipeline.baseline --index 0
+python -m src.pipeline.baseline --example-id 5a8b57f25542995d1e6f1371
+
+# Same question, but search the whole validation split
+python -m src.pipeline.baseline --index 0 --scope global
+
+# Any free-form question over the whole split
+python -m src.pipeline.baseline --question "Who directed the film Ed Wood?"
+```
+
+For dataset questions, the output shows the gold answer and marks each retrieved
+sentence as cited by the model (`*`) and/or a gold supporting fact (`G`).
+
+Example of the reliability problem this project targets (`--index 3`): retrieval
+finds both gold sentences (Ortaköy vs. Laleli), but the baseline still answers
+"yes" when the gold answer is "no".
+
+Next milestone: baseline evaluation on ~100 validation questions (retrieval
+recall@k and answer exact match / F1).
