@@ -123,13 +123,55 @@ cp .env.example .env               # Windows: Copy-Item .env.example .env
 
 ### Environment variables
 
-Copy `.env.example` to `.env`. Optional setting:
+Copy `.env.example` to `.env`. All settings are optional:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `HOTPOTQA_CACHE_DIR` | `data/raw/huggingface` | Cache directory used by `--source huggingface` |
+| `OLLAMA_HOST` | `http://localhost:11434` | Address of the local Ollama server |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Ollama model used for answer generation |
 
-Relative paths resolve from the repository root. No API key is required for HotpotQA.
+Relative paths resolve from the repository root. No API keys are required.
+
+## Quick start (fresh clone → results)
+
+Run these in order from the repository root after [Setup](#setup). The
+sentence chunks (`data/processed/*_chunks.jsonl`) are already in the repo; the
+FAISS index is not and must be built once.
+
+```bash
+source .venv/bin/activate
+
+# 1. Build the validation FAISS index (~1–2 min; downloads the embedding model, ~90 MB)
+python -m src.retrieval.build_index --split validation
+
+# 2. Start the local LLM (separate terminal, keep it running)
+ollama serve                   # or: brew services start ollama
+ollama pull llama3.2:3b        # first time only (~2 GB)
+
+# 3. Run the tests
+python -m pytest
+
+# 4. Try one question (Standard RAG, then Reranked RAG)
+python -m src.pipeline.baseline --index 3
+python -m src.pipeline.baseline --index 3 --rerank   # first run downloads the reranker, ~90 MB
+
+# 5. Reproduce the evaluation results (~2 min each)
+python -m evaluation.run_baseline --n 100            # Standard RAG
+python -m evaluation.run_baseline --n 100 --rerank   # Reranked RAG
+```
+
+Notes:
+
+- The embedding and reranker models download from Hugging Face on first use,
+  so steps 1 and 4 need internet once. After that you can run offline with
+  `export HF_HUB_OFFLINE=1`.
+- Steps 4–5 fail with "Cannot reach Ollama" if `ollama serve` is not running.
+  Check with `curl http://localhost:11434/api/version`.
+- Answers use temperature 0, so re-running gives the same results as
+  `evaluation/results/` (small differences are possible across Ollama versions).
+- Re-chunking is only needed if you change the chunking code:
+  `python -m src.ingestion.chunk_hotpotqa --split all`.
 
 ### Dependencies
 
@@ -155,8 +197,10 @@ python -m pytest
 python -m pytest --cov=src     # with coverage
 ```
 
-Chunking tests always run. Retrieval tests skip automatically if the FAISS
-index has not been built yet (`python -m src.retrieval.build_index --split validation`).
+Chunking, generation, reranking, pipeline, and metrics tests use small fakes,
+so they need neither Ollama nor model downloads. Retrieval tests skip
+automatically if the FAISS index has not been built yet
+(`python -m src.retrieval.build_index --split validation`).
 
 ## Load / verify the dataset
 
@@ -229,6 +273,9 @@ adaptive-rag/
 | Missing curated JSON | Confirm you are in the repo root and files exist under `data/raw/` |
 | LFS quota / bandwidth errors on GitHub | Use curated JSON for daily work; pull LFS only when needed |
 | Want to skip large download on clone | Use `GIT_LFS_SKIP_SMUDGE=1 git clone ...` then `git lfs pull` later |
+| `Cannot reach Ollama at http://localhost:11434` | Start `ollama serve` (or `brew services start ollama`) and confirm `ollama list` shows `llama3.2:3b` |
+| `FileNotFoundError` for a `.faiss` index | Run `python -m src.retrieval.build_index --split validation` |
+| `couldn't connect to 'https://huggingface.co'` | First model download needs internet; unset `HF_HUB_OFFLINE` and retry |
 
 ## Status
 
