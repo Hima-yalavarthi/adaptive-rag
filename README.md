@@ -73,6 +73,8 @@ data/raw/huggingface/**/*.arrow filter=lfs diff=lfs merge=lfs -text
 
 - Python **3.13** (tested with 3.13.12; pinned versions in `requirements.txt` assume it)
 - [Git LFS](https://git-lfs.com/) (required to download the full `.arrow` cache)
+- [Ollama](https://ollama.com/) for local answer generation (`brew install ollama`), with the
+  `llama3.2:3b` model (~2 GB): `ollama pull llama3.2:3b`
 - ~1 GB free disk for a full clone with LFS objects
 
 Install Git LFS once on your machine:
@@ -193,7 +195,9 @@ adaptive-rag/
 │   │   ├── build_index.py      # embed chunks + FAISS index
 │   │   └── search.py           # semantic search CLI
 │   ├── reranking/              # planned
-│   ├── generation/             # planned
+│   ├── generation/
+│   │   ├── prompts.py          # grounded prompt with numbered evidence
+│   │   └── llm.py              # Ollama client, JSON answer + citations
 │   ├── verification/           # planned
 │   └── adaptive/               # planned
 ├── evaluation/                 # planned
@@ -229,7 +233,8 @@ adaptive-rag/
 | Full HotpotQA HF cache via Git LFS | Done |
 | Sentence chunking → `data/processed/` | Done |
 | Embeddings + FAISS retrieval | Done |
-| Reranking, generation, verification | Not started |
+| Answer generation (local Ollama) | Done |
+| Reranking, verification | Not started |
 | Adaptive retry, evaluation | Not started |
 
 ### Step 1 — chunk HotpotQA contexts
@@ -266,4 +271,18 @@ python -m src.retrieval.search --split validation \
 Index files under `data/processed/indexes/` are large and Git-ignored; rebuild
 locally after cloning. Config JSON files record model name and vector counts.
 
-Next milestone: LLM answer generation for a baseline RAG pipeline.
+### Step 3 — grounded answer generation
+
+`src/generation/` sends the retrieved sentences to a local Ollama model as
+numbered evidence. The model must answer only from that evidence, return JSON
+`{"answer": ..., "citations": [...]}`, and reply `insufficient evidence` when the
+answer is not supported. Temperature is 0 so runs are repeatable.
+
+```bash
+ollama serve                 # keep running in a separate terminal
+ollama pull llama3.2:3b      # first time only
+```
+
+Configure the host and model in `.env` (`OLLAMA_HOST`, `OLLAMA_MODEL`).
+
+Next milestone: end-to-end baseline RAG command (question → retrieve → answer + evidence).

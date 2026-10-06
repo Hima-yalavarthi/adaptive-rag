@@ -1,1 +1,1 @@
-"""LLM answer generation (planned)."""
+"""Grounded answer generation with a local LLM (Ollama)."""
