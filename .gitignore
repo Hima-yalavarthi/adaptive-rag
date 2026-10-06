@@ -7,6 +7,8 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
+.coverage
+htmlcov/
 .ipynb_checkpoints/
 
 # Local configuration and secrets

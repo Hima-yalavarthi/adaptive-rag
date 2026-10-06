@@ -1,36 +1,33 @@
-# --- Current: config + dataset access ---
-python-dotenv>=1.0.0
-datasets>=2.19.0
+# Tested with Python 3.13.12 on macOS (Apple Silicon).
+# Pinned packages are installed and used by the current pipeline.
 
-# --- Document processing / numerics ---
-numpy>=1.26.0
-pandas>=2.2.0
-tqdm>=4.66.0
-tiktoken>=0.7.0
+# --- Config + dataset access ---
+python-dotenv==1.2.3
+datasets==5.0.1
+
+# --- Processing / numerics ---
+numpy==2.5.3
+pandas==3.0.5
+tqdm==4.70.1
 
 # --- Embeddings + vector retrieval ---
-sentence-transformers>=3.0.0
-faiss-cpu>=1.8.0
-torch>=2.2.0
+sentence-transformers==6.0.1
+faiss-cpu==1.15.0
+torch==2.14.0
+scikit-learn==1.9.1
 
-# --- LLM answer generation (API) ---
-openai>=1.40.0
-httpx>=0.27.0
-tenacity>=8.5.0
+# --- LLM generation (local Ollama server over HTTP) ---
+httpx==0.28.1
 
-# --- Backend API ---
+# --- Testing ---
+pytest==9.1.1
+pytest-cov==7.1.0
+
+# --- Planned stages (pin when implemented) ---
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.7.0
-pydantic-settings>=2.3.0
-
-# --- Evaluation (RAGAS + metrics) ---
 ragas>=0.1.21
-scikit-learn>=1.5.0
-
-# --- Testing ---
-pytest>=8.2.0
-pytest-cov>=5.0.0
 
 # Optional later (only if switching from FAISS to Postgres/pgvector):
 # psycopg[binary]>=3.2.0

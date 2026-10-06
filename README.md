@@ -71,7 +71,7 @@ data/raw/huggingface/**/*.arrow filter=lfs diff=lfs merge=lfs -text
 
 ## Prerequisites
 
-- Python **3.11+**
+- Python **3.13** (tested with 3.13.12; pinned versions in `requirements.txt` assume it)
 - [Git LFS](https://git-lfs.com/) (required to download the full `.arrow` cache)
 - ~1 GB free disk for a full clone with LFS objects
 
@@ -131,19 +131,30 @@ Relative paths resolve from the repository root. No API key is required for Hotp
 
 ### Dependencies
 
-All project stages are listed in `requirements.txt`:
+Packages used by the current pipeline are pinned to exact versions in
+`requirements.txt`. Packages for later stages keep minimum versions until
+they are implemented.
 
 | Group | Packages | Needed for |
 | --- | --- | --- |
 | Config / data | `python-dotenv`, `datasets` | `.env`, HotpotQA HF cache |
-| Processing | `numpy`, `pandas`, `tqdm`, `tiktoken` | data handling, progress, token/cost tracking |
-| Retrieval | `sentence-transformers`, `faiss-cpu`, `torch` | embeddings + vector search |
-| Generation | `openai`, `httpx`, `tenacity` | LLM API calls with retries |
-| API | `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings` | backend service |
-| Evaluation | `ragas`, `scikit-learn` | faithfulness / quality metrics |
+| Processing | `numpy`, `pandas`, `tqdm` | data handling, progress |
+| Retrieval | `sentence-transformers`, `faiss-cpu`, `torch`, `scikit-learn` | embeddings + vector search |
+| Generation | `httpx` | calls to a local Ollama LLM server |
 | Testing | `pytest`, `pytest-cov` | automated tests |
+| Planned | `fastapi`, `uvicorn`, `pydantic`, `ragas` | backend service, RAGAS evaluation |
 
 Postgres/`pgvector` is commented out in `requirements.txt` as an optional alternative to FAISS.
+
+## Run the tests
+
+```bash
+python -m pytest
+python -m pytest --cov=src     # with coverage
+```
+
+Chunking tests always run. Retrieval tests skip automatically if the FAISS
+index has not been built yet (`python -m src.retrieval.build_index --split validation`).
 
 ## Load / verify the dataset
 
@@ -186,7 +197,8 @@ adaptive-rag/
 │   ├── verification/           # planned
 │   └── adaptive/               # planned
 ├── evaluation/                 # planned
-├── tests/                      # planned
+├── tests/                      # pytest: chunking + retrieval
+├── pytest.ini
 ├── notebooks/
 └── data/
     ├── raw/
