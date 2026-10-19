@@ -152,19 +152,21 @@ ollama pull llama3.2:3b        # first time only (~2 GB)
 # 3. Run the tests
 python -m pytest
 
-# 4. Try one question (Standard RAG, then Reranked RAG)
+# 4. Try one question (Standard → Reranked → Verified)
 python -m src.pipeline.baseline --index 3
-python -m src.pipeline.baseline --index 3 --rerank   # first run downloads the reranker, ~90 MB
+python -m src.pipeline.baseline --index 3 --rerank          # downloads reranker (~90 MB) first time
+python -m src.pipeline.baseline --index 3 --rerank --verify # downloads NLI verifier first time
 
 # 5. Reproduce the evaluation results (~2 min each)
-python -m evaluation.run_baseline --n 100            # Standard RAG
-python -m evaluation.run_baseline --n 100 --rerank   # Reranked RAG
+python -m evaluation.run_baseline --n 100                   # Standard RAG
+python -m evaluation.run_baseline --n 100 --rerank          # Reranked RAG
+python -m evaluation.run_baseline --n 100 --rerank --verify # Verified RAG
 ```
 
 Notes:
 
-- The embedding and reranker models download from Hugging Face on first use,
-  so steps 1 and 4 need internet once. After that you can run offline with
+- The embedding, reranker, and NLI verifier download from Hugging Face on first
+  use, so steps 1 and 4 need internet once. After that you can run offline with
   `export HF_HUB_OFFLINE=1`.
 - Steps 4–5 fail with "Cannot reach Ollama" if `ollama serve` is not running.
   Check with `curl http://localhost:11434/api/version`.
@@ -244,14 +246,16 @@ adaptive-rag/
 │   │   ├── prompts.py          # grounded prompt with numbered evidence
 │   │   └── llm.py              # Ollama client, JSON answer + citations
 │   ├── pipeline/
-│   │   └── baseline.py         # Standard / Reranked RAG: retrieve → (rerank) → generate
-│   ├── verification/           # planned
-│   └── adaptive/               # planned
+│   │   └── baseline.py         # Standard / Reranked / Verified RAG
+│   ├── verification/
+│   │   ├── nli.py              # cross-encoder NLI evidence check
+│   │   └── confidence.py       # confidence score + abstain threshold
+│   └── adaptive/               # planned (retry)
 ├── evaluation/
 │   ├── metrics.py              # EM, F1, precision/recall
-│   ├── run_baseline.py         # Standard / Reranked RAG evaluation (--rerank)
+│   ├── run_baseline.py         # evaluation (--rerank, --verify)
 │   └── results/                # per-question results + summaries
-├── tests/                      # pytest: chunking, retrieval, generation, reranking, pipeline, metrics
+├── tests/                      # pytest: chunking, retrieval, generation, reranking, verification, pipeline, metrics
 ├── pytest.ini
 ├── notebooks/
 └── data/
@@ -290,7 +294,7 @@ adaptive-rag/
 | End-to-end baseline RAG command | Done |
 | Baseline evaluation (100 questions) | Done |
 | Cross-encoder reranking + Reranked RAG evaluation | Done |
-| Verification, confidence scoring | Not started |
+| Evidence verification + confidence scoring | Done |
 | Adaptive retry, three-system comparison | Not started |
 
 ### Step 1 — chunk HotpotQA contexts
@@ -456,4 +460,44 @@ What this shows:
 This motivates the next stages: verifying the answer against the evidence and
 scoring confidence, so weak or unsupported answers can be retried or abstained.
 
-Next milestone: evidence verification and confidence scoring.
+### Step 7 — Verified RAG (NLI + confidence)
+
+`src/verification/` checks whether the evidence supports the generated answer
+before returning it. An NLI cross-encoder
+(`cross-encoder/nli-deberta-v3-xsmall`) scores entailment /
+contradiction / neutral. For yes/no answers it compares both sides of the
+question. A confidence score combines support, retrieval strength, and
+citations. If confidence is below the threshold (default 0.35) or the
+verifier rejects the answer, the system returns `insufficient evidence`
+instead of a confident wrong answer.
+
+```bash
+python -m src.pipeline.baseline --index 3 --rerank --verify
+python -m evaluation.run_baseline --n 100 --rerank --verify
+```
+
+**Standard vs. Reranked vs. Verified** — same 100 validation questions
+(`evaluation/results/verified_n100_k5_summary.json`):
+
+| Metric | Standard | Reranked | Verified |
+| --- | ---: | ---: | ---: |
+| Exact match | 40.0% | 44.0% | 25.0% |
+| F1 | 50.1% | 55.7% | 32.4% |
+| Confidently wrong | 48.0% | ~47.0% | **26.0%** |
+| Insufficient evidence | 12.0% | 9.0% | 49.0% |
+| Caught wrong (abstained) | — | — | 21.0% |
+| False abstentions | — | — | 19.0% |
+| Avg latency | 1.02 s | 1.12 s | 1.08 s |
+
+What this shows:
+
+- Verification trades answer EM for reliability: confidently wrong answers
+  fall from ~47% to 26%.
+- On the Laleli Mosque failure case, the LLM still says "yes", but the
+  verifier abstains because the "no" side of the yes/no check is stronger.
+- Abstaining alone costs EM (44% → 25%) because some correct answers are
+  also rejected (19 false abstentions). That is why Week 9 adds **adaptive
+  retry**: low confidence should retrieve more / rewrite the query before
+  giving up.
+
+Next milestone: adaptive retry when confidence is low.

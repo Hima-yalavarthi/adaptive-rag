@@ -54,6 +54,58 @@ def test_reranked_pipeline_fetches_candidates_then_reranks():
     assert result.rerank_s >= 0
 
 
+class FakeVerifier:
+    def __init__(self, entailment=0.1, contradiction=0.8):
+        self.entailment = entailment
+        self.contradiction = contradiction
+
+    def verify(self, question, answer, chunks, citations=None):
+        from src.verification.nli import VerificationResult
+
+        return VerificationResult(
+            supported=self.entailment >= self.contradiction,
+            entailment=self.entailment,
+            contradiction=self.contradiction,
+            neutral=0.1,
+            premise="p",
+            hypothesis="h",
+            used_citations=bool(citations),
+            latency_s=0.01,
+        )
+
+
+def test_verified_pipeline_abstains_when_confidence_low():
+    from src.generation.prompts import INSUFFICIENT_EVIDENCE
+
+    retriever, generator = FakeRetriever(), FakeGenerator()
+    rag = BaselineRAG(
+        retriever,
+        generator,
+        top_k=2,
+        verifier=FakeVerifier(entailment=0.1, contradiction=0.8),
+        confidence_threshold=0.45,
+    )
+    result = rag.answer("Same nationality?")
+    assert result.raw_answer == "yes"
+    assert result.answer == INSUFFICIENT_EVIDENCE
+    assert result.abstained_by_verifier is True
+    assert result.confidence is not None and result.confidence.reject
+
+
+def test_verified_pipeline_keeps_answer_when_supported():
+    rag = BaselineRAG(
+        FakeRetriever(),
+        FakeGenerator(),
+        top_k=2,
+        verifier=FakeVerifier(entailment=0.9, contradiction=0.05),
+        confidence_threshold=0.45,
+    )
+    result = rag.answer("Same nationality?")
+    assert result.answer == "yes"
+    assert result.abstained_by_verifier is False
+    assert result.confidence is not None and result.confidence.accept
+
+
 def test_gold_facts_pairs_titles_with_sentence_ids():
     example = {"supporting_facts": {"title": ["Scott Derrickson", "Ed Wood"], "sent_id": [0, 0]}}
     assert gold_facts(example) == {("Scott Derrickson", 0), ("Ed Wood", 0)}
