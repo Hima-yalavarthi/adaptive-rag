@@ -29,6 +29,23 @@ User Question
 | Reranked RAG | Retrieve + rerank + generate |
 | Adaptive RAG | Above + verification, confidence, bounded retries |
 
+**Validation results** (dev set: 100 HotpotQA validation questions, 1 run at
+temperature 0, paired bootstrap 95% CI over questions). I claim a win only if
+the CI of Δ **excludes 0**. Full audit: [`docs/validation_audit.md`](docs/validation_audit.md).
+
+```text
+Retrieval recall@5 (Reranked)     = 0.72 [0.66, 0.77]
+  Δ vs. Standard RAG              = +0.12 [+0.07, +0.18]  · 1 run, n=100  (excludes 0)
+
+Confidently wrong (Verified RAG)  = 0.26 [0.18, 0.35]
+  Δ vs. Standard RAG              = −0.22 [−0.32, −0.13]  · 1 run, n=100  (excludes 0)
+
+Exact match (Reranked)            = 0.44 [0.34, 0.54]
+  Δ vs. Standard RAG              = +0.04 [−0.04, +0.12]  · 1 run, n=100  (includes 0; not claimed)
+```
+
+Reproduce: `python -m evaluation.compare evaluation/results/baseline_n100_k5.jsonl evaluation/results/reranked_n100_k5.jsonl`
+
 ## Dataset overview
 
 This project uses [HotpotQA](https://hotpotqa.github.io/) (`hotpotqa/hotpot_qa`,
@@ -251,11 +268,14 @@ adaptive-rag/
 │   │   ├── nli.py              # cross-encoder NLI evidence check
 │   │   └── confidence.py       # confidence score + abstain threshold
 │   └── adaptive/               # planned (retry)
+├── docs/
+│   └── validation_audit.md     # Week 9/10 claim, split, leakage, CIs
 ├── evaluation/
 │   ├── metrics.py              # EM, F1, precision/recall
+│   ├── compare.py              # paired bootstrap 95% CIs + McNemar
 │   ├── run_baseline.py         # evaluation (--rerank, --verify)
 │   └── results/                # per-question results + summaries
-├── tests/                      # pytest: chunking, retrieval, generation, reranking, verification, pipeline, metrics
+├── tests/                      # pytest including train/test ID leakage checks
 ├── pytest.ini
 ├── notebooks/
 └── data/
